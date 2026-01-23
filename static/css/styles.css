@@ -1,0 +1,356 @@
+:root {
+    --bg-color: #1e1e1e;
+    --sidebar-bg: #252526;
+    --text-color: #d4d4d4;
+    --accent-color: #007acc;
+    --border-color: #3e3e42;
+    --highlight-bg: #37373d;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    height: 100vh;
+    overflow: hidden; /* Prevent body scroll */
+}
+
+.container {
+    display: flex;
+    height: 100%;
+}
+
+.job-selection-screen {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: var(--bg-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.job-card-container {
+    background-color: var(--sidebar-bg);
+    padding: 2rem;
+    border-radius: 8px;
+    width: 600px;
+    max-width: 90%;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.job-creation-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.job-creation-row input {
+    flex: 1;
+    padding: 8px;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    border-radius: 4px;
+}
+
+.job-selection-list {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.job-card {
+    padding: 15px;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.job-card:hover {
+    background-color: var(--highlight-bg);
+}
+
+.job-card:last-child {
+    border-bottom: none;
+}
+
+
+/* Sidebar */
+.sidebar {
+    width: 300px;
+    background-color: var(--sidebar-bg);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+h1 {
+    font-size: 1.2rem;
+    margin-bottom: 1.5rem;
+    color: #fff;
+}
+
+h3 {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 0.5rem;
+    margin-top: 1.5rem;
+}
+
+.section:first-child h3 {
+    margin-top: 0;
+}
+
+/* Project Controls */
+.project-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 0.5rem;
+}
+
+.project-controls button {
+    width: 100%;
+    background-color: #333;
+    padding: 6px;
+}
+
+.project-controls button:hover {
+    background-color: #444;
+}
+
+.job-management {
+    margin-top: 10px;
+    background: rgba(0,0,0,0.2);
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.job-management h4 {
+    margin: 0 0 5px 0;
+    font-size: 0.8em;
+    color: #aaa;
+    text-transform: uppercase;
+}
+
+.job-list {
+    margin-bottom: 8px;
+    max-height: 100px;
+    overflow-y: auto;
+}
+
+.job-item {
+    font-size: 0.85em;
+    padding: 3px 6px;
+    background: #444;
+    margin-bottom: 2px;
+    border-radius: 2px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.job-count {
+    color: #888;
+}
+
+/* Image List */
+.image-list {
+    border: 1px solid var(--border-color);
+    height: 150px;
+    overflow-y: auto;
+    background: var(--bg-color);
+    margin-bottom: 1rem;
+}
+
+.image-item {
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.image-item:hover {
+    background-color: var(--highlight-bg);
+}
+
+.image-item.active {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+.image-item.annotated::after {
+    content: ' ✓';
+    color: #4caf50;
+    font-weight: bold;
+}
+
+/* Class List */
+.class-controls {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 0.5rem;
+}
+
+input[type="text"] {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    color: white;
+    padding: 4px 8px;
+    flex: 1;
+}
+
+button {
+    background: var(--highlight-bg);
+    border: 1px solid var(--border-color);
+    color: white;
+    cursor: pointer;
+    padding: 4px 10px;
+}
+
+button:hover {
+    background: var(--border-color);
+}
+
+.primary-btn {
+    background-color: var(--accent-color);
+    width: 100%;
+    padding: 8px;
+    font-weight: bold;
+    border: none;
+}
+
+.primary-bt .delete-class-btn {
+    opacity: 0;
+    color: #ff4444;
+    font-weight: bold;
+    padding: 0 5px;
+    border-radius: 3px;
+}
+
+.class-item:hover .delete-class-btn {
+    opacity: 1;
+}
+
+.class-item .delete-class-btn:hover {
+    background: rgba(255, 68, 68, 0.2);
+}
+
+.class-itemn:hover {
+    background-color: #0062a3;
+}
+
+.class-list {
+    border: 1px solid var(--border-color);
+    min-height: 100px;
+    background: var(--bg-color);
+}
+
+.class-item {
+    padding: 5px 10px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.class-item:hover {
+    background: var(--highlight-bg);
+}
+
+.class-item.selected {
+    border-left: 3px solid var(--accent-color);
+    background: var(--highlight-bg);
+}
+
+.color-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+}
+
+/* Main Editor Area */
+.editor-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: #111;
+    position: relative;
+    overflow: hidden; /* Scroll handled on wrapper usually, but simple approach is flex center */
+    align-items: center;
+    justify-content: center;
+}
+
+.canvas-wrapper {
+    position: relative;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    max-width: 95%;
+    max-height: 90%;
+    overflow: auto;
+}
+
+canvas {
+    display: block;
+    cursor: crosshair;
+}
+
+.status-info {
+    position: absolute;
+    bottom: 10px;
+ 
+
+/* Selection Controls */
+.selection-controls {
+    background: var(--highlight-bg);
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    margin-bottom: 1rem;
+}
+
+.control-row {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.9em;
+}
+
+select {
+    background: #1e1e1e;
+    color: white;
+    border: 1px solid #555;
+    padding: 4px;
+    margin-top: 5px;
+}   left: 10px;
+    background: rgba(0,0,0,0.7);
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    pointer-events: none;
+}
+
+.instructions {
+    margin-top: auto;
+    font-size: 0.8rem;
+    color: #888;
+}
+
+.instructions ul {
+    padding-left: 1.2rem;
+}

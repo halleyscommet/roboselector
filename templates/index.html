@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RoboSelector - Simple Bounding Box Annotator</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <!-- JSZip for zipping files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+</head>
+<body>
+    <!-- Job Selection Screen -->
+    <div id="jobSelectionScreen" class="job-selection-screen">
+        <div class="job-card-container">
+            <h2>Select a Job Dataset</h2>
+            <div class="job-creation-row">
+                <input type="text" id="newJobNameInput" placeholder="New Job Name (e.g. Batch_01)">
+                <button id="createJobBtn">Create New Job</button>
+            </div>
+            <div id="jobSelectionList" class="job-selection-list">
+                <!-- Javascript will populate this -->
+            </div>
+        </div>
+    </div>
+
+    <div id="workspaceContainer" class="container" style="display:none;">
+        <aside class="sidebar">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h1>RoboSelector</h1>
+                <button id="backToJobsBtn" style="font-size:0.7em;">Back</button>
+            </div>
+            
+            <div class="section">
+                <h3>1. Project / Team</h3>
+                <div class="project-controls">
+                    <button id="saveProjectBtn" title="Download current workspace">Save Workspace</button>
+                    
+                    <div class="job-management">
+                        <h4>Active Jobs</h4>
+                        <div id="jobList" class="job-list">
+                            <!-- Jobs will appear here -->
+                        </div>
+                        <input type="file" id="importJobInput" accept=".json" style="display: none;">
+                        <button id="importJobBtn" title="Merge another project file into this workspace">Import Job (Merge)</button>
+                        
+                        <input type="file" id="importZipInput" accept=".zip" style="display: none;">
+                        <button id="importZipBtn" title="Import existing YOLO dataset (images + labels)">Import Dataset (ZIP)</button>
+
+                        <button id="clearWorkspaceBtn" style="background-color: #842029;">Clear All</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>2. Upload Images</h3>
+                <input type="file" id="imageInput" multiple accept="image/*" />
+                <button id="importYoloBtn" title="Import YOLO dataset ZIP with pre-annotations" style="margin-top:5px;">Import YOLO (ZIP)</button>
+                <input type="file" id="importYoloInput" accept=".zip" style="display: none;">
+                <div id="imageList" class="image-list"></div>
+            </div>
+
+            <div class="section">
+                <h3>3. Classes</h3>
+                <div class="class-controls">
+                    <input type="text" id="newClassInput" placeholder="New class name">
+                    <button id="addClassBtn">Add</button>
+                </div>
+                <!-- Selection Controls inside Sidebar -->
+                <div id="selectionControls" class="selection-controls" style="display:none; margin-top: 10px;">
+                    <div class="control-row">
+                        <label style="font-size:0.8em; color:#ccc;">Selected Box Class:</label>
+                        <select id="reassignClassSelect"></select>
+                    </div>
+                </div>
+                <div id="classList" class="class-list" style="margin-top: 10px;"></div>
+                <p class="help-text">Select a class to draw.</p>
+            </div>
+
+            <div class="section">
+                <h3>4. Export</h3>
+                <button id="exportBtn" class="primary-btn">Download YOLO ZIP</button>
+            </div>
+
+            <div class="instructions">
+                <h4>Controls</h4>
+                <ul>
+                    <li><strong>Click & Drag:</strong> Draw box</li>
+                    <li><strong>Click box:</strong> Select to move/resize</li>
+                    <li><strong>Delete Key:</strong> Delete selected box</li>
+                    <li><strong>Arrow Keys:</strong> Navigate images</li>
+                </ul>
+            </div>
+        </aside>
+
+        <main class="editor-area">
+            <div class="canvas-wrapper">
+                <canvas id="editorCanvas"></canvas>
+            </div>
+            <div id="statusinfo" class="status-info">No image selected</div>
+        </main>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,6 +1,10 @@
 [
   {
-    "name": "robot",
-    "color": "#0930B5"
+    "color": "#0930B5",
+    "name": "robot"
+  },
+  {
+    "name": "ball",
+    "color": "#F63904"
   }
 ]

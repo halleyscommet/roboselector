@@ -802,6 +802,32 @@ function handleKeyDown(e) {
             updateSelectionUI();
             saveCurrentAnnotation();
         }
+    } else if (e.key === 'r' || e.key === 'R') {
+        // Repeat annotations from previous image
+        if (currentImageIndex > 0) {
+            const prevImage = images[currentImageIndex - 1];
+            if (prevImage.boxes && prevImage.boxes.length > 0) {
+                // Deep copy boxes from previous image
+                images[currentImageIndex].boxes = prevImage.boxes.map(box => ({
+                    classIndex: box.classIndex,
+                    x: box.x,
+                    y: box.y,
+                    w: box.w,
+                    h: box.h
+                }));
+                selectedBoxIndex = -1;
+                drawCanvas();
+                renderImageList();
+                updateStatus();
+                updateSelectionUI();
+                saveCurrentAnnotation();
+                statusInfo.textContent = `Repeated ${prevImage.boxes.length} annotations from ${prevImage.name}`;
+            } else {
+                statusInfo.textContent = 'Previous image has no annotations to repeat';
+            }
+        } else {
+            statusInfo.textContent = 'No previous image to repeat from';
+        }
     }
 }
 

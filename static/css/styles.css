@@ -354,3 +354,46 @@ select {
 .instructions ul {
     padding-left: 1.2rem;
 }
+
+/* Tool Toggle */
+.tool-toggle {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 5px;
+}
+
+.tool-btn {
+    flex: 1;
+    padding: 8px;
+    font-weight: bold;
+    text-align: center;
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-color);
+    color: var(--text-color);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.tool-btn:hover {
+    background: var(--highlight-bg);
+}
+
+.tool-btn.active {
+    border-color: var(--accent-color);
+    background: rgba(0, 122, 204, 0.2);
+    color: #fff;
+}
+
+.ignore-zone-info {
+    font-size: 0.8em;
+    color: #aaa;
+    background: rgba(255, 100, 100, 0.1);
+    border: 1px solid rgba(255, 100, 100, 0.3);
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.ignore-zone-info p {
+    margin: 0 0 5px 0;
+}

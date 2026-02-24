@@ -13,6 +13,14 @@ let dragStartX = 0;
 let dragStartY = 0;
 let originalBoxState = null; 
 
+// Tool Mode: 'box' or 'polygon'
+let toolMode = 'box';
+
+// Polygon Ignore Zone State
+let currentPolygonPoints = []; // Points being drawn
+let selectedPolygonIndex = -1; // Selected existing polygon
+let polygonHoverClose = false; // Hovering over first point to close
+
 // Canvas & Drawing State
 const canvas = document.getElementById('editorCanvas');
 const ctx = canvas.getContext('2d');
@@ -52,6 +60,12 @@ const createJobBtn = document.getElementById('createJobBtn');
 const newJobNameInput = document.getElementById('newJobNameInput');
 const backToJobsBtn = document.getElementById('backToJobsBtn');
 
+// Tool Mode Elements
+const toolBoxBtn = document.getElementById('toolBoxBtn');
+const toolPolygonBtn = document.getElementById('toolPolygonBtn');
+const ignoreZoneInfo = document.getElementById('ignoreZoneInfo');
+const clearIgnoreZonesBtn = document.getElementById('clearIgnoreZonesBtn');
+
 // --- Initialization ---
 
 async function init() {
@@ -68,6 +82,11 @@ async function init() {
     imageInput.addEventListener('change', handleImageUpload);
     addClassBtn.addEventListener('click', addNewClass);
     exportBtn.addEventListener('click', exportData);
+
+    // Tool mode toggle
+    toolBoxBtn.addEventListener('click', () => setToolMode('box'));
+    toolPolygonBtn.addEventListener('click', () => setToolMode('polygon'));
+    clearIgnoreZonesBtn.addEventListener('click', clearAllIgnoreZones);
     
     // YOLO Import
     if (importYoloBtn) {
@@ -101,8 +120,35 @@ async function init() {
     canvas.addEventListener('mousedown', handleMouseDown);
     canvas.addEventListener('mousemove', handleMouseMove);
     canvas.addEventListener('mouseup', handleMouseUp);
+    canvas.addEventListener('dblclick', handleDoubleClick);
     
     await loadJobList();
+}
+
+function setToolMode(mode) {
+    // Cancel any in-progress polygon
+    currentPolygonPoints = [];
+    selectedPolygonIndex = -1;
+    selectedBoxIndex = -1;
+    interactionMode = 'NONE';
+
+    toolMode = mode;
+    toolBoxBtn.classList.toggle('active', mode === 'box');
+    toolPolygonBtn.classList.toggle('active', mode === 'polygon');
+    ignoreZoneInfo.style.display = mode === 'polygon' ? 'block' : 'none';
+    updateSelectionUI();
+    drawCanvas();
+}
+
+function clearAllIgnoreZones() {
+    if (currentImageIndex === -1) return;
+    const imgData = images[currentImageIndex];
+    if (!imgData.ignoreRegions || imgData.ignoreRegions.length === 0) return;
+    if (!confirm('Clear all ignore zones on this image?')) return;
+    imgData.ignoreRegions = [];
+    selectedPolygonIndex = -1;
+    drawCanvas();
+    saveCurrentAnnotation();
 }
 
 async function loadJobList() {
@@ -282,6 +328,8 @@ function selectImage(index) {
     
     currentImageIndex = index;
     selectedBoxIndex = -1;
+    selectedPolygonIndex = -1;
+    currentPolygonPoints = [];
     updateSelectionUI();
     const imgData = images[index];
     
@@ -315,6 +363,18 @@ function drawCanvas() {
     // We assume it's loaded because we redraw on image load.
     ctx.drawImage(img, 0, 0);
 
+    // Draw ignore regions first (underneath boxes)
+    const ignoreRegions = imgData.ignoreRegions || [];
+    ignoreRegions.forEach((region, idx) => {
+        const isSelected = (idx === selectedPolygonIndex && toolMode === 'polygon');
+        drawIgnorePolygon(region.points, isSelected, idx);
+    });
+
+    // Draw in-progress polygon
+    if (currentPolygonPoints.length > 0) {
+        drawInProgressPolygon(currentPolygonPoints);
+    }
+
     const boxes = imgData.boxes || [];
 
     boxes.forEach((box, idx) => {
@@ -341,6 +401,89 @@ function drawCanvas() {
         const n = cls ? cls.name : 'object';
         drawBox(startX, startY, width, height, c, n, true); 
     }
+}
+
+function drawIgnorePolygon(points, isSelected, index) {
+    if (!points || points.length < 2) return;
+    
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i].x, points[i].y);
+    }
+    ctx.closePath();
+    
+    // Fill with semi-transparent red
+    ctx.fillStyle = isSelected ? 'rgba(255, 60, 60, 0.35)' : 'rgba(255, 60, 60, 0.2)';
+    ctx.fill();
+    
+    // Stroke
+    ctx.strokeStyle = isSelected ? '#ff3333' : '#ff6666';
+    ctx.lineWidth = isSelected ? 3 : 2;
+    ctx.setLineDash([6, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    // Draw vertex dots
+    points.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, isSelected ? 5 : 3, 0, Math.PI * 2);
+        ctx.fillStyle = '#ff3333';
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    });
+    
+    // Label
+    const cx = points.reduce((s, p) => s + p.x, 0) / points.length;
+    const cy = points.reduce((s, p) => s + p.y, 0) / points.length;
+    const label = `ignore #${index + 1}`;
+    ctx.font = '12px Arial';
+    const tw = ctx.measureText(label).width;
+    ctx.fillStyle = 'rgba(200, 30, 30, 0.8)';
+    ctx.fillRect(cx - tw / 2 - 3, cy - 8, tw + 6, 16);
+    ctx.fillStyle = '#fff';
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, cx, cy - 6);
+    ctx.textAlign = 'start';
+    
+    ctx.restore();
+}
+
+function drawInProgressPolygon(points) {
+    if (points.length === 0) return;
+    
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i].x, points[i].y);
+    }
+    // Draw line to cursor
+    ctx.lineTo(currentMouseX, currentMouseY);
+    
+    ctx.strokeStyle = '#ff9900';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    // Draw vertex dots
+    points.forEach((p, i) => {
+        ctx.beginPath();
+        const radius = (i === 0 && polygonHoverClose && points.length >= 3) ? 8 : 4;
+        ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = (i === 0 && polygonHoverClose && points.length >= 3) ? '#00ff00' : '#ff9900';
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    });
+    
+    ctx.restore();
 }
 
 function drawBox(x, y, w, h, color, label, isSelected) {
@@ -471,6 +614,11 @@ function handleMouseDown(e) {
     startY = pos.y;
     currentMouseX = pos.x;
     currentMouseY = pos.y;
+
+    if (toolMode === 'polygon') {
+        handlePolygonClick(pos);
+        return;
+    }
     
     const hit = hitTest(pos.x, pos.y);
     
@@ -498,10 +646,106 @@ function handleMouseDown(e) {
     drawCanvas();
 }
 
+function handlePolygonClick(pos) {
+    // If we have points and user clicks near the first point to close
+    if (currentPolygonPoints.length >= 3) {
+        const first = currentPolygonPoints[0];
+        const dist = Math.hypot(pos.x - first.x, pos.y - first.y);
+        if (dist < 15) {
+            finishPolygon();
+            return;
+        }
+    }
+    
+    // If no polygon in progress, check if clicking an existing polygon
+    if (currentPolygonPoints.length === 0) {
+        const hitPoly = hitTestPolygon(pos.x, pos.y);
+        if (hitPoly !== -1) {
+            selectedPolygonIndex = hitPoly;
+            selectedBoxIndex = -1;
+            updateSelectionUI();
+            drawCanvas();
+            return;
+        }
+        selectedPolygonIndex = -1;
+    }
+    
+    // Add point to current polygon
+    currentPolygonPoints.push({ x: pos.x, y: pos.y });
+    drawCanvas();
+}
+
+function handleDoubleClick(e) {
+    if (toolMode !== 'polygon') return;
+    if (currentPolygonPoints.length >= 3) {
+        finishPolygon();
+    }
+}
+
+function finishPolygon() {
+    if (currentPolygonPoints.length < 3) {
+        currentPolygonPoints = [];
+        drawCanvas();
+        return;
+    }
+    
+    const imgData = images[currentImageIndex];
+    if (!imgData.ignoreRegions) imgData.ignoreRegions = [];
+    imgData.ignoreRegions.push({ points: [...currentPolygonPoints] });
+    
+    selectedPolygonIndex = imgData.ignoreRegions.length - 1;
+    currentPolygonPoints = [];
+    drawCanvas();
+    saveCurrentAnnotation();
+    statusInfo.textContent = `Added ignore zone #${imgData.ignoreRegions.length}`;
+}
+
+function hitTestPolygon(x, y) {
+    if (currentImageIndex < 0) return -1;
+    const regions = images[currentImageIndex].ignoreRegions || [];
+    
+    // Check in reverse order (top-most first)
+    for (let i = regions.length - 1; i >= 0; i--) {
+        if (pointInPolygon(x, y, regions[i].points)) return i;
+    }
+    return -1;
+}
+
+function pointInPolygon(x, y, points) {
+    let inside = false;
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+        const xi = points[i].x, yi = points[i].y;
+        const xj = points[j].x, yj = points[j].y;
+        const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
 function handleMouseMove(e) {
     const pos = getMousePos(e);
     currentMouseX = pos.x;
     currentMouseY = pos.y;
+
+    if (toolMode === 'polygon') {
+        // Check hover over first point for closing
+        if (currentPolygonPoints.length >= 3) {
+            const first = currentPolygonPoints[0];
+            const dist = Math.hypot(pos.x - first.x, pos.y - first.y);
+            polygonHoverClose = dist < 15;
+        } else {
+            polygonHoverClose = false;
+        }
+        
+        if (currentPolygonPoints.length > 0) {
+            canvas.style.cursor = polygonHoverClose ? 'pointer' : 'crosshair';
+            drawCanvas();
+        } else {
+            const hitPoly = hitTestPolygon(pos.x, pos.y);
+            canvas.style.cursor = hitPoly !== -1 ? 'pointer' : 'crosshair';
+        }
+        return;
+    }
 
     if (interactionMode === 'NONE') {
         const hit = hitTest(pos.x, pos.y);
@@ -629,7 +873,8 @@ async function saveCurrentAnnotation() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 imageName: img.name,
-                boxes: img.boxes
+                boxes: img.boxes,
+                ignoreRegions: img.ignoreRegions || []
             })
         });
     } catch(err) {
@@ -658,8 +903,13 @@ function updateSelectionUI() {
 
 function updateStatus() {
     if (currentImageIndex !== -1) {
-        const count = images[currentImageIndex].boxes ? images[currentImageIndex].boxes.length : 0;
-        statusInfo.textContent = `${images[currentImageIndex].name} (${count} objects)`;
+        const imgData = images[currentImageIndex];
+        const count = imgData.boxes ? imgData.boxes.length : 0;
+        const zoneCount = imgData.ignoreRegions ? imgData.ignoreRegions.length : 0;
+        let text = `${imgData.name} (${count} objects`;
+        if (zoneCount > 0) text += `, ${zoneCount} ignore zone${zoneCount > 1 ? 's' : ''}`;
+        text += ')';
+        statusInfo.textContent = text;
     } else {
         statusInfo.textContent = "No image selected";
     }
@@ -792,8 +1042,26 @@ function handleKeyDown(e) {
         if (currentImageIndex > 0) {
             selectImage(currentImageIndex - 1);
         }
+    } else if (e.key === 'Escape') {
+        if (currentPolygonPoints.length > 0) {
+            currentPolygonPoints = [];
+            drawCanvas();
+        } else {
+            selectedBoxIndex = -1;
+            selectedPolygonIndex = -1;
+            updateSelectionUI();
+            drawCanvas();
+        }
+    } else if (e.key === 'p' || e.key === 'P') {
+        setToolMode(toolMode === 'polygon' ? 'box' : 'polygon');
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedBoxIndex !== -1) {
+        if (toolMode === 'polygon' && selectedPolygonIndex !== -1) {
+            images[currentImageIndex].ignoreRegions.splice(selectedPolygonIndex, 1);
+            selectedPolygonIndex = -1;
+            drawCanvas();
+            saveCurrentAnnotation();
+            statusInfo.textContent = 'Ignore zone deleted';
+        } else if (selectedBoxIndex !== -1) {
             images[currentImageIndex].boxes.splice(selectedBoxIndex, 1);
             selectedBoxIndex = -1;
             drawCanvas();
@@ -806,22 +1074,36 @@ function handleKeyDown(e) {
         // Repeat annotations from previous image
         if (currentImageIndex > 0) {
             const prevImage = images[currentImageIndex - 1];
-            if (prevImage.boxes && prevImage.boxes.length > 0) {
+            const hasBoxes = prevImage.boxes && prevImage.boxes.length > 0;
+            const hasZones = prevImage.ignoreRegions && prevImage.ignoreRegions.length > 0;
+            if (hasBoxes || hasZones) {
                 // Deep copy boxes from previous image
-                images[currentImageIndex].boxes = prevImage.boxes.map(box => ({
-                    classIndex: box.classIndex,
-                    x: box.x,
-                    y: box.y,
-                    w: box.w,
-                    h: box.h
-                }));
+                if (hasBoxes) {
+                    images[currentImageIndex].boxes = prevImage.boxes.map(box => ({
+                        classIndex: box.classIndex,
+                        x: box.x,
+                        y: box.y,
+                        w: box.w,
+                        h: box.h
+                    }));
+                }
+                // Deep copy ignore regions from previous image
+                if (hasZones) {
+                    images[currentImageIndex].ignoreRegions = prevImage.ignoreRegions.map(region => ({
+                        points: region.points.map(p => ({ x: p.x, y: p.y }))
+                    }));
+                }
                 selectedBoxIndex = -1;
+                selectedPolygonIndex = -1;
                 drawCanvas();
                 renderImageList();
                 updateStatus();
                 updateSelectionUI();
                 saveCurrentAnnotation();
-                statusInfo.textContent = `Repeated ${prevImage.boxes.length} annotations from ${prevImage.name}`;
+                const parts = [];
+                if (hasBoxes) parts.push(`${prevImage.boxes.length} boxes`);
+                if (hasZones) parts.push(`${prevImage.ignoreRegions.length} ignore zones`);
+                statusInfo.textContent = `Repeated ${parts.join(' + ')} from ${prevImage.name}`;
             } else {
                 statusInfo.textContent = 'Previous image has no annotations to repeat';
             }

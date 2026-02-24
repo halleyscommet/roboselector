@@ -5,7 +5,7 @@ import io
 import shutil
 import time
 from flask import Flask, render_template, request, jsonify, send_from_directory, send_file
-from PIL import Image
+from PIL import Image, ImageDraw
 
 app = Flask(__name__)
 
@@ -289,10 +289,11 @@ def import_yolo_dataset(job_id):
 
 @app.route('/api/jobs/<job_id>/annotations', methods=['POST'])
 def save_annotation(job_id):
-    # Expects { imageName, boxes }
+    # Expects { imageName, boxes, ignoreRegions? }
     data = request.json
     image_name = data.get('imageName')
     boxes = data.get('boxes')
+    ignore_regions = data.get('ignoreRegions', [])
     
     if not image_name:
         return jsonify({'error': 'No image name'}), 400
@@ -303,8 +304,12 @@ def save_annotation(job_id):
          os.makedirs(annotations_dir, exist_ok=True)
         
     path = os.path.join(annotations_dir, f"{image_name}.json")
+    annotation_data = {
+        'boxes': boxes,
+        'ignoreRegions': ignore_regions
+    }
     with open(path, 'w') as f:
-        json.dump(boxes, f, indent=2)
+        json.dump(annotation_data, f, indent=2)
         
     return jsonify({'status': 'saved'})
 
@@ -334,11 +339,18 @@ def get_job_data(job_id):
                 
                 # Get annotations
                 boxes = []
+                ignore_regions = []
                 ann_path = os.path.join(annotations_dir, f"{filename}.json")
                 if os.path.exists(ann_path):
                     try:
                         with open(ann_path, 'r') as f:
-                            boxes = json.load(f)
+                            ann_data = json.load(f)
+                        # Support both old format (flat array) and new format (object)
+                        if isinstance(ann_data, list):
+                            boxes = ann_data
+                        elif isinstance(ann_data, dict):
+                            boxes = ann_data.get('boxes', [])
+                            ignore_regions = ann_data.get('ignoreRegions', [])
                     except:
                         pass
                 
@@ -355,7 +367,8 @@ def get_job_data(job_id):
                     'url': f'/data/jobs/{job_id}/images/{filename}',
                     'width': width,
                     'height': height,
-                    'boxes': boxes
+                    'boxes': boxes,
+                    'ignoreRegions': ignore_regions
                 })
     
     # Sort images by name
@@ -416,48 +429,103 @@ def export_dataset():
                     
                 img_path = os.path.join(images_dir, filename)
                 
-                # Write Image
-                zf.write(img_path, f"{img_folder}{filename}")
-                
-                # Load annotation
+                # Load annotation data
+                boxes = []
+                ignore_regions = []
                 ann_path = os.path.join(annotations_dir, f"{filename}.json")
                 if os.path.exists(ann_path):
                     with open(ann_path, 'r') as f:
-                        boxes = json.load(f)
+                        ann_data = json.load(f)
                     
-                    # We need dimensions to normalize
-                    width, height = 0, 0
+                    if isinstance(ann_data, list):
+                        boxes = ann_data
+                    elif isinstance(ann_data, dict):
+                        boxes = ann_data.get('boxes', [])
+                        ignore_regions = ann_data.get('ignoreRegions', [])
+                    else:
+                        boxes = []
+                
+                # Apply ignore zone masking if there are ignore regions
+                if ignore_regions:
                     try:
                         with Image.open(img_path) as im:
+                            im = im.copy()
                             width, height = im.size
-                    except:
-                        pass
+                            
+                            # Create mask: white = areas to black out
+                            mask = Image.new('L', (width, height), 0)
+                            mask_draw = ImageDraw.Draw(mask)
+                            
+                            # Draw ignore region polygons onto mask
+                            for region in ignore_regions:
+                                pts = region.get('points', [])
+                                if len(pts) >= 3:
+                                    poly = [(p['x'], p['y']) for p in pts]
+                                    mask_draw.polygon(poly, fill=255)
+                            
+                            # Punch through bounding box areas so annotated objects stay visible
+                            for box in boxes:
+                                bx, by = box['x'], box['y']
+                                bw, bh = box['w'], box['h']
+                                # Normalize negative dimensions
+                                if bw < 0:
+                                    bx += bw
+                                    bw = abs(bw)
+                                if bh < 0:
+                                    by += bh
+                                    bh = abs(bh)
+                                mask_draw.rectangle([bx, by, bx + bw, by + bh], fill=0)
+                            
+                            # Apply mask: set masked pixels to black
+                            black = Image.new('RGB', (width, height), (0, 0, 0))
+                            im = Image.composite(black, im, mask)
+                            
+                            # Write masked image to ZIP
+                            img_bytes = io.BytesIO()
+                            fmt = 'JPEG' if filename.lower().endswith(('.jpg', '.jpeg')) else 'PNG'
+                            im.save(img_bytes, format=fmt, quality=95)
+                            img_bytes.seek(0)
+                            zf.writestr(f"{img_folder}{filename}", img_bytes.read())
+                    except Exception as e:
+                        # Fallback: write original image
+                        zf.write(img_path, f"{img_folder}{filename}")
+                else:
+                    # No ignore regions — write original image
+                    zf.write(img_path, f"{img_folder}{filename}")
+                
+                # Write YOLO label
+                width, height = 0, 0
+                try:
+                    with Image.open(img_path) as im:
+                        width, height = im.size
+                except:
+                    pass
+                
+                if width > 0 and height > 0 and boxes:
+                    yolo_lines = []
+                    dw = 1.0 / width
+                    dh = 1.0 / height
                     
-                    if width > 0 and height > 0 and boxes:
-                        yolo_lines = []
-                        dw = 1.0 / width
-                        dh = 1.0 / height
+                    for box in boxes:
+                        cls_idx = box.get('classIndex', 0)
+                        if cls_idx >= len(class_names):
+                            cls_idx = 0
                         
-                        for box in boxes:
-                            cls_idx = box.get('classIndex', 0)
-                            if cls_idx >= len(class_names):
-                                cls_idx = 0
-                            
-                            bx, by, bw, bh = box['x'], box['y'], box['w'], box['h']
-                            
-                            # Normalize
-                            x_center = bx + bw / 2.0
-                            y_center = by + bh / 2.0
-                            
-                            nx = x_center * dw
-                            ny = y_center * dh
-                            nw = bw * dw
-                            nh = bh * dh
-                            
-                            yolo_lines.append(f"{cls_idx} {nx:.6f} {ny:.6f} {nw:.6f} {nh:.6f}")
+                        bx, by, bw, bh = box['x'], box['y'], box['w'], box['h']
                         
-                        txt_name = os.path.splitext(filename)[0] + ".txt"
-                        zf.writestr(f"{lbl_folder}{txt_name}", '\n'.join(yolo_lines))
+                        # Normalize
+                        x_center = bx + bw / 2.0
+                        y_center = by + bh / 2.0
+                        
+                        nx = x_center * dw
+                        ny = y_center * dh
+                        nw = bw * dw
+                        nh = bh * dh
+                        
+                        yolo_lines.append(f"{cls_idx} {nx:.6f} {ny:.6f} {nw:.6f} {nh:.6f}")
+                    
+                    txt_name = os.path.splitext(filename)[0] + ".txt"
+                    zf.writestr(f"{lbl_folder}{txt_name}", '\n'.join(yolo_lines))
 
     memory_file.seek(0)
     return send_file(

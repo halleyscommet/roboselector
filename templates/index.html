@@ -78,7 +78,19 @@
             </div>
 
             <div class="section">
-                <h3>4. Export</h3>
+                <h3>4. Tool Mode</h3>
+                <div class="tool-toggle">
+                    <button id="toolBoxBtn" class="tool-btn active" title="Draw bounding boxes">&#9634; Box</button>
+                    <button id="toolPolygonBtn" class="tool-btn" title="Draw ignore zone polygon">&#11039; Polygon</button>
+                </div>
+                <div id="ignoreZoneInfo" class="ignore-zone-info" style="display:none;">
+                    <p>Click to place points. Double-click or click first point to close polygon.</p>
+                    <button id="clearIgnoreZonesBtn" style="background-color: #842029; width:100%; margin-top:5px;">Clear All Ignore Zones</button>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>5. Export</h3>
                 <button id="exportBtn" class="primary-btn">Download YOLO ZIP</button>
             </div>
 
@@ -87,8 +99,11 @@
                 <ul>
                     <li><strong>Click & Drag:</strong> Draw box</li>
                     <li><strong>Click box:</strong> Select to move/resize</li>
-                    <li><strong>Delete Key:</strong> Delete selected box</li>
+                    <li><strong>Delete Key:</strong> Delete selected</li>
                     <li><strong>Arrow Keys:</strong> Navigate images</li>
+                    <li><strong>Escape:</strong> Cancel polygon / Deselect</li>
+                    <li><strong>P Key:</strong> Toggle polygon mode</li>
+                    <li><strong>R Key:</strong> Repeat prev annotations</li>
                 </ul>
             </div>
         </aside>
